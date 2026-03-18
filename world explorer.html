@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World Explorer</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Inter', sans-serif;
+  background: #0e1117;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  color: #fff;
+}
+
+/* HEADER */
+#header {
+  height: 50px;
+  background: #0a0c12;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  flex-shrink: 0;
+  z-index: 100;
+}
+.logo { font-size: 17px; font-weight: 600; color: #fff; }
+.logo span { color: #4a9eff; }
+
+.search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.search-box {
+  display: flex; align-items: center; gap: 8px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  padding: 6px 14px;
+  width: 240px;
+}
+.search-box svg { width: 13px; height: 13px; stroke: #666; fill: none; stroke-width: 2; stroke-linecap: round; flex-shrink: 0; }
+.search-box input {
+  background: none; border: none; outline: none;
+  color: #fff; font-size: 13px; font-family: 'Inter', sans-serif; width: 100%;
+}
+.search-box input::placeholder { color: #444; }
+
+#sDrop {
+  position: absolute; top: calc(100% + 4px); left: 0;
+  width: 100%; background: #12141e;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px; z-index: 500;
+  display: none; overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+}
+.s-item {
+  padding: 9px 14px; display: flex; align-items: center; gap: 10px;
+  font-size: 13px; color: #bbb; cursor: pointer;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  transition: background 0.1s;
+}
+.s-item:hover { background: rgba(74,158,255,0.1); color: #fff; }
+.s-item:last-child { border-bottom: none; }
+.s-flag { font-size: 15px; }
+.s-sub { margin-left: auto; font-size: 11px; color: #444; }
+
+.hint { font-size: 12px; color: #3a3f52; }
+
+/* MAP CONTAINER */
+#mapWrap {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  cursor: crosshair;
+  background: #0e1117;
+}
+
+#worldSvg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Country paths */
+.country {
+  fill: #1e2d3d;
+  stroke: #2a4060;
+  stroke-width: 0.4;
+  cursor: pointer;
+  transition: fill 0.15s;
+}
+.country:hover { fill: #2a4a6a; stroke: #4a9eff; stroke-width: 0.8; }
+.country.selected { fill: #1e4a7a; stroke: #4a9eff; stroke-width: 1; }
+
+/* Graticule lines */
+.graticule { fill: none; stroke: rgba(255,255,255,0.04); stroke-width: 0.3; }
+.sphere { fill: #0d1520; }
+
+/* Ocean label */
+.ocean-label {
+  fill: rgba(100,160,255,0.25);
+  font-style: italic;
+  font-size: 11px;
+  pointer-events: none;
+  font-family: Georgia, serif;
+  letter-spacing: 0.06em;
+}
+
+/* TOOLTIP */
+#tip {
+  position: absolute;
+  background: rgba(10,12,20,0.97);
+  border: 1px solid rgba(74,158,255,0.4);
+  border-radius: 8px;
+  padding: 8px 13px;
+  pointer-events: none;
+  display: none;
+  z-index: 200;
+  white-space: nowrap;
+}
+#tip .t-name { font-size: 13px; font-weight: 600; color: #fff; margin-bottom: 2px; }
+#tip .t-sub { font-size: 11px; color: #556; }
+
+/* INFO PANEL */
+#panel {
+  position: absolute;
+  top: 60px; right: 16px;
+  width: 320px;
+  background: rgba(10,12,22,0.97);
+  border: 1px solid rgba(74,158,255,0.25);
+  border-radius: 14px;
+  z-index: 300;
+  display: none;
+  flex-direction: column;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.7);
+  backdrop-filter: blur(12px);
+  max-height: calc(100vh - 80px);
+}
+#panel.show { display: flex; }
+
+.p-head {
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  display: flex; align-items: center; gap: 12px;
+  flex-shrink: 0;
+}
+.p-flag { 
+  font-size: 36px; line-height: 1; flex-shrink: 0; 
+  display: flex; align-items: center; justify-content: center;
+}
+#pFlagImg {
+  width: 48px; height: 32px; object-fit: cover; 
+  border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  display: none;
+}
+.flag-skeleton {
+  width: 48px; height: 32px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  animation: pulse-bg 1.5s infinite;
+  display: none;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+@keyframes pulse-bg {
+  0% { background: rgba(255, 255, 255, 0.05); }
+  50% { background: rgba(255, 255, 255, 0.15); }
+  100% { background: rgba(255, 255, 255, 0.05); }
+}
+
+.p-name { font-size: 18px; font-weight: 600; color: #fff; margin-bottom: 2px; }
+.p-cont { font-size: 11px; color: #4a9eff; text-transform: uppercase; letter-spacing: 0.07em; }
+.p-close {
+  margin-left: auto; background: none; border: none;
+  color: #444; font-size: 20px; cursor: pointer;
+  line-height: 1; padding: 2px 4px; flex-shrink: 0;
+  transition: color 0.15s;
+}
+.p-close:hover { color: #fff; }
+
+.p-stats {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 8px; padding: 12px 18px;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  flex-shrink: 0;
+}
+.p-stat {
+  background: rgba(255,255,255,0.04);
+  border-radius: 7px; padding: 9px 10px;
+}
+.p-sk { font-size: 10px; color: #445; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 3px; }
+.p-sv { font-size: 13px; font-weight: 600; color: #ddd; }
+
+.p-tabs {
+  display: flex;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  flex-shrink: 0;
+}
+.p-tab {
+  flex: 1; padding: 9px 4px; text-align: center;
+  font-size: 11px; color: #445; cursor: pointer;
+  text-transform: uppercase; letter-spacing: 0.05em;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s; font-weight: 500;
+}
+.p-tab.on { color: #4a9eff; border-bottom-color: #4a9eff; }
+.p-tab:hover:not(.on) { color: #888; }
+
+.p-body {
+  padding: 14px 18px;
+  overflow-y: auto;
+  flex: 1;
+}
+.p-body::-webkit-scrollbar { width: 3px; }
+.p-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
+
+.ai-text { font-size: 13px; line-height: 1.75; color: #8899aa; }
+.ai-text p { margin-bottom: 10px; }
+.ai-text p:last-child { margin-bottom: 0; }
+.ai-text a { color: #4a9eff; text-decoration: none; }
+.ai-text a:hover { text-decoration: underline; }
+
+.loading {
+  display: flex; align-items: center; gap: 10px;
+  color: #445; font-size: 13px; padding: 8px 0;
+}
+.spin {
+  width: 15px; height: 15px; flex-shrink: 0;
+  border: 2px solid rgba(74,158,255,0.15);
+  border-top-color: #4a9eff;
+  border-radius: 50%;
+  animation: sp 0.7s linear infinite;
+}
+@keyframes sp { to { transform: rotate(360deg); } }
+
+/* ZOOM CONTROLS */
+#zoom {
+  position: absolute; bottom: 40px; left: 16px;
+  display: flex; flex-direction: column; gap: 4px; z-index: 200;
+}
+.z-btn {
+  width: 32px; height: 32px;
+  background: rgba(10,12,22,0.95);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 7px; color: #ccc; font-size: 18px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: all 0.15s; line-height: 1;
+}
+.z-btn:hover { border-color: #4a9eff; color: #4a9eff; }
+
+/* STATUS */
+#status {
+  height: 26px; background: #080a10;
+  border-top: 1px solid rgba(255,255,255,0.05);
+  display: flex; align-items: center; padding: 0 16px; gap: 20px;
+  flex-shrink: 0;
+}
+.st { font-size: 11px; color: #333; display: flex; align-items: center; gap: 5px; }
+.st-dot { width: 5px; height: 5px; border-radius: 50%; background: #2ecc71; animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.4} }
+</style>
+</head>
+<body>
+
+<div id="header">
+  <div class="logo">World <span>Explorer</span></div>
+  <div class="search-wrap">
+    <div class="search-box">
+      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <input type="text" id="sInput" placeholder="Search country…" autocomplete="off">
+    </div>
+    <div id="sDrop"></div>
+  </div>
+  <div class="hint">Hover or click any country to explore</div>
+</div>
+
+<div id="mapWrap">
+  <svg id="worldSvg"></svg>
+  <div id="tip"><div class="t-name" id="tName"></div><div class="t-sub" id="tSub"></div></div>
+
+  <div id="panel">
+    <div class="p-head">
+      <div class="p-flag">
+        <div id="pFlagSkeleton" class="flag-skeleton"></div>
+        <img id="pFlagImg" src="" alt="Flag">
+        <span id="pFlagEmoji" style="display:none;">🌍</span>
+      </div>
+      <div>
+        <div class="p-name" id="pName">Country</div>
+        <div class="p-cont" id="pCont">Continent</div>
+      </div>
+      <button class="p-close" id="pClose">×</button>
+    </div>
+    <div class="p-stats" id="pStats"></div>
+    <div class="p-tabs">
+      <div class="p-tab on" data-t="overview">Overview</div>
+      <div class="p-tab" data-t="history">History</div>
+      <div class="p-tab" data-t="culture">Culture</div>
+      <div class="p-tab" data-t="geography">Geography</div>
+    </div>
+    <div class="p-body" id="pBody"></div>
+  </div>
+
+  <div id="zoom">
+    <div class="z-btn" id="zIn">+</div>
+    <div class="z-btn" id="zOut">−</div>
+    <div class="z-btn" id="zReset" style="font-size:13px">⟳</div>
+  </div>
+</div>
+
+<div id="status">
+  <div class="st"><span class="st-dot"></span>Map ready</div>
+  <div class="st" id="stCoord">Move cursor over map</div>
+  <div class="st" id="stZoom" style="margin-left:auto;">Zoom: 1×</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script>
+// ── COUNTRY DATA ──
+// Manual overrides. The API handles everything else!
+const CDATA = {
+  'India': { history: 'India is home to one of the oldest civilizations in the world.' }
+};
+
+const ALIAS = {
+  'United States of America':'United States',
+  'Dem. Rep. Congo':'Congo, Dem. Rep.',
+  'Democratic Republic of the Congo':'Congo, Dem. Rep.',
+  'Korea, South':'South Korea','Republic of Korea':'South Korea',
+  'Czech Republic':'Czech Republic','Czechia':'Czech Republic',
+  'United Kingdom':'United Kingdom','Great Britain':'United Kingdom',
+};
+
+function resolve(name) {
+  return CDATA[name] || CDATA[ALIAS[name]] || null;
+}
+
+// ── SVG SETUP ──
+const wrap = document.getElementById('mapWrap');
+const svgEl = document.getElementById('worldSvg');
+const svg = d3.select('#worldSvg');
+
+let W, H;
+function resize() {
+  W = wrap.clientWidth;
+  H = wrap.clientHeight;
+  svgEl.setAttribute('viewBox', `0 0 ${W} ${H}`);
+}
+resize();
+window.addEventListener('resize', resize);
+
+let scale0 = (W / 6.2);
+let tx0 = W / 2, ty0 = H / 2;
+const projection = d3.geoNaturalEarth1().scale(scale0).translate([tx0, ty0]);
+const path = d3.geoPath().projection(projection);
+
+const gMap = svg.append('g').attr('id','gMap');
+gMap.append('path').datum({type:'Sphere'}).attr('class','sphere').attr('d', path);
+const graticule = d3.geoGraticule().step([20,20])();
+gMap.append('path').datum(graticule).attr('class','graticule').attr('d', path);
+
+const oceanLabels = [
+  {text:'PACIFIC OCEAN', lat:0, lng:-150},
+  {text:'ATLANTIC OCEAN', lat:5, lng:-30},
+  {text:'INDIAN OCEAN', lat:-20, lng:75},
+];
+
+let countries_g = gMap.append('g').attr('id','countries');
+let labels_g = svg.append('g').attr('id','oceanLabels');
+
+const GEOJSON_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json';
+
+const topoScript = document.createElement('script');
+topoScript.src = 'https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js';
+document.head.appendChild(topoScript);
+
+d3.json(GEOJSON_URL).then(world => {
+  function tryDraw() {
+    if (!window.topojson) { setTimeout(tryDraw, 100); return; }
+    const features = window.topojson.feature(world, world.objects.countries).features;
+
+    countries_g.selectAll('path').remove();
+    labels_g.selectAll('text').remove();
+
+    countries_g.selectAll('path')
+      .data(features)
+      .join('path')
+      .attr('class','country')
+      .attr('d', path)
+      .attr('data-id', d => d.id)
+      .on('mousemove', onHover)
+      .on('mouseleave', () => { document.getElementById('tip').style.display = 'none'; })
+      .on('click', onClick);
+
+    oceanLabels.forEach(ol => {
+      const pos = projection([ol.lng, ol.lat]);
+      if (pos) {
+        labels_g.append('text').attr('class','ocean-label')
+          .attr('x', pos[0]).attr('y', pos[1]).attr('text-anchor','middle').text(ol.text);
+      }
+    });
+  }
+  tryDraw();
+});
+
+const NUM_NAMES = {
+  4: 'Afghanistan', 8: 'Albania', 12: 'Algeria', 20: 'Andorra', 24: 'Angola', 28: 'Antigua and Barbuda', 32: 'Argentina', 51: 'Armenia', 36: 'Australia', 40: 'Austria', 31: 'Azerbaijan', 44: 'Bahamas', 48: 'Bahrain', 50: 'Bangladesh', 52: 'Barbados', 112: 'Belarus', 56: 'Belgium', 84: 'Belize', 204: 'Benin', 64: 'Bhutan', 68: 'Bolivia', 70: 'Bosnia and Herzegovina', 72: 'Botswana', 76: 'Brazil', 96: 'Brunei', 100: 'Bulgaria', 854: 'Burkina Faso', 108: 'Burundi', 132: 'Cape Verde', 116: 'Cambodia', 120: 'Cameroon', 124: 'Canada', 140: 'Central African Republic', 148: 'Chad', 152: 'Chile', 156: 'China', 170: 'Colombia', 174: 'Comoros', 180: 'Congo, Dem. Rep.', 178: 'Congo, Rep.', 188: 'Costa Rica', 384: 'Ivory Coast', 191: 'Croatia', 192: 'Cuba', 196: 'Cyprus', 203: 'Czech Republic', 208: 'Denmark', 262: 'Djibouti', 214: 'Dominican Republic', 218: 'Ecuador', 818: 'Egypt', 222: 'El Salvador', 226: 'Equatorial Guinea', 232: 'Eritrea', 233: 'Estonia', 748: 'Eswatini', 231: 'Ethiopia', 242: 'Fiji', 246: 'Finland', 250: 'France', 266: 'Gabon', 270: 'Gambia', 268: 'Georgia', 276: 'Germany', 288: 'Ghana', 300: 'Greece', 304: 'Greenland', 320: 'Guatemala', 324: 'Guinea', 624: 'Guinea-Bissau', 328: 'Guyana', 332: 'Haiti', 340: 'Honduras', 348: 'Hungary', 352: 'Iceland', 356: 'India', 360: 'Indonesia', 364: 'Iran', 368: 'Iraq', 372: 'Ireland', 376: 'Israel', 380: 'Italy', 388: 'Jamaica', 392: 'Japan', 400: 'Jordan', 398: 'Kazakhstan', 404: 'Kenya', 408: 'North Korea', 410: 'South Korea', 414: 'Kuwait', 417: 'Kyrgyzstan', 418: 'Laos', 428: 'Latvia', 422: 'Lebanon', 426: 'Lesotho', 430: 'Liberia', 434: 'Libya', 440: 'Lithuania', 442: 'Luxembourg', 450: 'Madagascar', 454: 'Malawi', 458: 'Malaysia', 462: 'Maldives', 466: 'Mali', 478: 'Mauritania', 480: 'Mauritius', 484: 'Mexico', 498: 'Moldova', 496: 'Mongolia', 504: 'Morocco', 508: 'Mozambique', 104: 'Myanmar', 516: 'Namibia', 524: 'Nepal', 528: 'Netherlands', 554: 'New Zealand', 558: 'Nicaragua', 562: 'Niger', 566: 'Nigeria', 807: 'North Macedonia', 578: 'Norway', 512: 'Oman', 586: 'Pakistan', 275: 'Palestine', 591: 'Panama', 598: 'Papua New Guinea', 600: 'Paraguay', 604: 'Peru', 608: 'Philippines', 616: 'Poland', 620: 'Portugal', 634: 'Qatar', 642: 'Romania', 643: 'Russia', 646: 'Rwanda', 682: 'Saudi Arabia', 686: 'Senegal', 688: 'Serbia', 694: 'Sierra Leone', 702: 'Singapore', 703: 'Slovakia', 705: 'Slovenia', 706: 'Somalia', 710: 'South Africa', 728: 'South Sudan', 724: 'Spain', 144: 'Sri Lanka', 729: 'Sudan', 740: 'Suriname', 752: 'Sweden', 756: 'Switzerland', 760: 'Syria', 158: 'Taiwan', 762: 'Tajikistan', 834: 'Tanzania', 764: 'Thailand', 626: 'Timor-Leste', 768: 'Togo', 780: 'Trinidad and Tobago', 788: 'Tunisia', 792: 'Turkey', 795: 'Turkmenistan', 800: 'Uganda', 804: 'Ukraine', 784: 'United Arab Emirates', 826: 'United Kingdom', 840: 'United States', 858: 'Uruguay', 860: 'Uzbekistan', 548: 'Vanuatu', 862: 'Venezuela', 704: 'Vietnam', 732: 'Western Sahara', 887: 'Yemen', 894: 'Zambia', 716: 'Zimbabwe'
+};
+
+function idToNameFn(id) { return NUM_NAMES[parseInt(id)] || null; }
+
+function onHover(event, d) {
+  const name = idToNameFn(d.id);
+  const info = name ? resolve(name) : null;
+  const displayName = name || 'Unknown territory';
+
+  document.getElementById('tName').textContent = (info && info.flag ? info.flag + ' ' : '') + displayName;
+  document.getElementById('tSub').textContent = info && info.continent ? (info.continent + ' · ' + info.capital) : 'Click to explore';
+
+  const tip = document.getElementById('tip');
+  tip.style.display = 'block';
+  const rect = wrap.getBoundingClientRect();
+  let x = event.clientX - rect.left + 14;
+  let y = event.clientY - rect.top - 10;
+  if (x + 220 > W) x = event.clientX - rect.left - 230;
+  if (y < 0) y = 10;
+  tip.style.left = x + 'px';
+  tip.style.top = y + 'px';
+
+  const [lng, lat] = projection.invert([event.offsetX, event.offsetY]) || [0,0];
+  const la = Math.abs(lat).toFixed(1) + (lat >= 0 ? '°N' : '°S');
+  const lo = Math.abs(lng).toFixed(1) + (lng >= 0 ? '°E' : '°W');
+  document.getElementById('stCoord').textContent = la + '  ' + lo;
+}
+
+let selId = null;
+function onClick(event, d) {
+  const name = idToNameFn(d.id);
+  if (!name) return;
+  
+  const info = resolve(name) || { 
+    flag: '🌍', continent: 'Loading...', capital: 'Loading...', pop: '...', area: '...' 
+  };
+
+  if (selId) countries_g.select(`[data-id="${selId}"]`).classed('selected', false);
+  selId = d.id;
+  d3.select(event.currentTarget).classed('selected', true);
+
+  openPanel(name, info);
+}
+
+// ── PANEL & APIS ──
+let curCountry = null;
+
+async function fetchCountryAPI(name) {
+  const imgEl = document.getElementById('pFlagImg');
+  const skeleton = document.getElementById('pFlagSkeleton');
+  const emoji = document.getElementById('pFlagEmoji');
+
+  try {
+    const res = await fetch(`https://restcountries.com/v3.1/name/${encodeURIComponent(name)}?fullText=true`);
+    const data = await res.json();
+    
+    if (data && data[0]) {
+      const cData = data[0];
+      
+      // Inject Stats Data dynamically
+      if (cData.capital) document.getElementById('svCap').textContent = cData.capital[0];
+      if (cData.population) {
+        let pop = cData.population;
+        let popStr = pop > 1000000 ? (pop / 1000000).toFixed(1) + 'M' : (pop / 1000).toFixed(1) + 'K';
+        document.getElementById('svPop').textContent = popStr;
+      }
+      if (cData.area) document.getElementById('svArea').textContent = (cData.area / 1000000).toFixed(2) + 'M km²';
+      if (cData.region) {
+         document.getElementById('svReg').textContent = cData.region;
+         document.getElementById('pCont').textContent = cData.region;
+      }
+
+      // Load the Flag Image
+      if (cData.flags) {
+        const tempImg = new Image();
+        tempImg.onload = () => {
+          skeleton.style.display = 'none';
+          imgEl.src = cData.flags.svg;
+          imgEl.style.display = 'block';
+        };
+        tempImg.onerror = () => {
+          skeleton.style.display = 'none';
+          emoji.style.display = 'block';
+        };
+        tempImg.src = cData.flags.svg;
+      }
+    } else {
+      skeleton.style.display = 'none';
+      emoji.style.display = 'block';
+    }
+  } catch(e) {
+    console.log("Using fallback data");
+    skeleton.style.display = 'none';
+    emoji.style.display = 'block';
+  }
+}
+
+function openPanel(name, info) {
+  curCountry = {name, info};
+
+  document.getElementById('pFlagImg').style.display = 'none';
+  document.getElementById('pFlagEmoji').style.display = 'none';
+  document.getElementById('pFlagEmoji').textContent = info.flag || '🌍';
+  document.getElementById('pFlagSkeleton').style.display = 'block';
+  
+  document.getElementById('pName').textContent = name;
+  document.getElementById('pCont').textContent = info.continent || 'Region';
+
+  document.getElementById('pStats').innerHTML = `
+    <div class="p-stat"><div class="p-sk">Capital</div><div class="p-sv" id="svCap">${info.capital || 'N/A'}</div></div>
+    <div class="p-stat"><div class="p-sk">Population</div><div class="p-sv" id="svPop">${info.pop || 'N/A'}</div></div>
+    <div class="p-stat"><div class="p-sk">Area</div><div class="p-sv" id="svArea">${info.area || 'N/A'}</div></div>
+    <div class="p-stat"><div class="p-sk">Region</div><div class="p-sv" id="svReg" style="font-size:11px">${info.continent || 'N/A'}</div></div>
+  `;
+
+  fetchCountryAPI(name);
+
+  document.querySelectorAll('.p-tab').forEach(t => t.classList.toggle('on', t.dataset.t === 'overview'));
+  document.getElementById('panel').classList.add('show');
+  loadDetails(name, 'overview');
+}
+
+document.getElementById('pClose').addEventListener('click', () => {
+  document.getElementById('panel').classList.remove('show');
+  if (selId) { countries_g.select(`[data-id="${selId}"]`).classed('selected', false); selId = null; }
+  curCountry = null;
+});
+
+document.querySelectorAll('.p-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.p-tab').forEach(t => t.classList.remove('on'));
+    tab.classList.add('on');
+    if (curCountry) loadDetails(curCountry.name, tab.dataset.t);
+  });
+});
+
+async function loadDetails(name, tab) {
+  const body = document.getElementById('pBody');
+  const info = resolve(name);
+
+  if (info && info[tab]) {
+    body.innerHTML = `<div class="ai-text"><p>${info[tab]}</p></div>`;
+    return;
+  }
+
+  body.innerHTML = '<div class="loading"><div class="spin"></div>Loading public data…</div>';
+
+  try {
+    if (tab === 'overview') {
+      const res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(name)}`);
+      const data = await res.json();
+      if (data.extract_html) {
+        body.innerHTML = `<div class="ai-text">${data.extract_html}</div>`;
+      } else {
+        body.innerHTML = `<div class="ai-text" style="color:#445">Overview not available. You can add it manually in the code.</div>`;
+      }
+    } else {
+      body.innerHTML = `<div class="ai-text"><p>Detailed <b>${tab}</b> information for ${name} can be added manually to the code, or you can explore it on <a href="https://en.wikipedia.org/wiki/${encodeURIComponent(name)}" target="_blank">Wikipedia</a>.</p></div>`;
+    }
+  } catch {
+    body.innerHTML = `<div class="ai-text" style="color:#445">Unable to load content.</div>`;
+  }
+}
+
+// ── ZOOM & PAN ──
+let zoomLevel = 1;
+const zoom = d3.zoom().scaleExtent([0.8, 8]).on('zoom', (event) => {
+  gMap.attr('transform', event.transform);
+  labels_g.attr('transform', event.transform);
+  zoomLevel = event.transform.k;
+  document.getElementById('stZoom').textContent = 'Zoom: ' + zoomLevel.toFixed(1) + '×';
+});
+
+svg.call(zoom);
+document.getElementById('zIn').addEventListener('click', () => svg.transition().duration(400).call(zoom.scaleBy, 1.5));
+document.getElementById('zOut').addEventListener('click', () => svg.transition().duration(400).call(zoom.scaleBy, 0.67));
+document.getElementById('zReset').addEventListener('click', () => svg.transition().duration(600).call(zoom.transform, d3.zoomIdentity));
+
+// ── SEARCH ──
+const sInput = document.getElementById('sInput');
+const sDrop = document.getElementById('sDrop');
+
+sInput.addEventListener('input', () => {
+  const q = sInput.value.trim().toLowerCase();
+  if (!q) { sDrop.style.display = 'none'; return; }
+  
+  // Search through NUM_NAMES directly
+  const hits = Object.values(NUM_NAMES).filter(name => name.toLowerCase().includes(q)).slice(0, 7);
+  if (!hits.length) { sDrop.style.display = 'none'; return; }
+  
+  sDrop.innerHTML = hits.map(name => `
+    <div class="s-item" data-name="${name}">
+      🌍 <span style="margin-left:8px;">${name}</span>
+    </div>`).join('');
+  sDrop.style.display = 'block';
+});
+
+sDrop.addEventListener('click', e => {
+  const item = e.target.closest('.s-item');
+  if (!item) return;
+  const name = item.dataset.name;
+  sInput.value = ''; sDrop.style.display = 'none';
+  
+  const info = resolve(name) || { flag: '🌍', continent: 'Loading...', capital: 'Loading...', pop: '...', area: '...' };
+  openPanel(name, info);
+});
+
+document.addEventListener('click', e => { if (!sInput.contains(e.target) && !sDrop.contains(e.target)) sDrop.style.display = 'none'; });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { document.getElementById('panel').classList.remove('show'); sDrop.style.display = 'none'; } });
+</script>
+</body>
+</html>
