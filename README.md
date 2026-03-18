@@ -23,8 +23,3 @@ An interactive, lightweight, and fully client-side web application that lets use
 ## 🚀 Getting Started
 
 Because this project is entirely frontend-based, there is no build step or node package installation required.
-
-### Local Development
-1. Clone the repository:
-   ```bash
-   git clone [https://github.com/yourusername/world-explorer.git](https://github.com/yourusername/world-explorer.git)
